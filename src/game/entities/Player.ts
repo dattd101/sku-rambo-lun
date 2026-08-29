@@ -139,8 +139,8 @@ export class Player extends StickActor {
     const weapon = WEAPONS[this.weapon];
     if (now < this.nextShotAt) return;
 
-    let dx = this.facing;
-    let dy = 0;
+    let dx: number = this.facing;
+    let dy: number = 0;
 
     if (up && !crouching) {
       if (horizontal !== 0) {
