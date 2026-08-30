@@ -13,7 +13,8 @@ Mini run-and-gun 2D bằng **Next.js 15 + Phaser 3 + TypeScript**. Player và bo
 - Shotgun: 30 viên
 - Rocket Launcher: 30 viên
 - Bot sprite: bắn súng, ném lựu đạn, tự nhảy và tấn công trên không
-- Mini boss tank 80 HP với nhiều phase tốc độ
+- Player 50 HP: đạn bot -5 HP, lựu đạn bot -25 HP; HP về 0 mới mất 1 mạng
+- Boss cuối map 100 HP, di chuyển/bắn/ném lựu đạn/nhảy né đạn
 - Camera side-scroll + encounter lock
 - Pickup H / S / R
 - Score + high score lưu localStorage

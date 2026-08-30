@@ -32,6 +32,8 @@ type Controls = {
 };
 
 export class Player extends StickActor {
+  readonly maxHp = 50;
+  hp = 50;
   weapon: WeaponId = 'pistol';
   ammo = Number.POSITIVE_INFINITY;
   grenades = 10;
@@ -118,6 +120,7 @@ export class Player extends StickActor {
   }
 
   respawn(x: number, y: number, now: number) {
+    this.hp = this.maxHp;
     this.setPosition(x, y);
     this.setVelocity(0, 0);
     this.inputEnabled = true;
@@ -126,6 +129,17 @@ export class Player extends StickActor {
     body.enable = true;
     this.invulnerableUntil = now + 1500;
     this.setVisualAlpha(1);
+  }
+
+
+  takeDamage(amount: number) {
+    if (!this.active || !this.inputEnabled) return false;
+    this.hp = Math.max(0, this.hp - Math.max(0, amount));
+    return this.hp <= 0;
+  }
+
+  restoreFullHp() {
+    this.hp = this.maxHp;
   }
 
   knockOut() {

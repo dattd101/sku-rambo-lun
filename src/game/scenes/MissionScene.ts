@@ -37,6 +37,7 @@ export class MissionScene extends Phaser.Scene {
   private hudHigh!: Phaser.GameObjects.Text;
   private hudWeapon!: Phaser.GameObjects.Text;
   private hudGrenades!: Phaser.GameObjects.Text;
+  private hudHp!: Phaser.GameObjects.Text;
   private hudLives!: Phaser.GameObjects.Text;
   private encounterText!: Phaser.GameObjects.Text;
   private bossBarBg!: Phaser.GameObjects.Rectangle;
@@ -232,7 +233,8 @@ export class MissionScene extends Phaser.Scene {
     this.hudHigh = this.add.text(18, 34, '', { ...style, fontSize: '13px', color: '#99afbf' }).setScrollFactor(0).setDepth(101);
     this.hudWeapon = this.add.text(390, 19, '', style).setScrollFactor(0).setDepth(101);
     this.hudGrenades = this.add.text(750, 19, '', style).setScrollFactor(0).setDepth(101);
-    this.hudLives = this.add.text(1040, 19, '', style).setScrollFactor(0).setDepth(101);
+    this.hudHp = this.add.text(930, 19, '', { ...style, color: '#8dff9b' }).setScrollFactor(0).setDepth(101);
+    this.hudLives = this.add.text(1100, 19, '', style).setScrollFactor(0).setDepth(101);
 
     this.encounterText = this.add.text(GAME_WIDTH / 2, 88, '', {
       fontFamily: 'Arial Black, Arial', fontSize: '24px', color: '#ffe46a', stroke: '#14202a', strokeThickness: 5,
@@ -584,15 +586,15 @@ export class MissionScene extends Phaser.Scene {
 
     const kind = projectile.getData('kind') as string;
 
-    // Any enemy projectile touching Player is lethal. Grenades also explode
-    // immediately on contact, while gun bullets / rockets are destroyed first.
+    // Grenade contact triggers the explosion damage path (-25 HP).
     if (kind === 'grenade-enemy') {
       this.explodeEnemyGrenade(projectile);
       return;
     }
 
+    // Every normal enemy / boss bullet removes exactly 5 HP.
     projectile.destroy();
-    this.killPlayer();
+    this.damagePlayer(5);
   }
 
   private enemyBulletHitsWorld(bulletObj: ArcadePhysicsObject) {
@@ -672,7 +674,7 @@ export class MissionScene extends Phaser.Scene {
     const y = grenade.y;
     grenade.destroy();
     this.grenadeExplosionFx(x, y, 95);
-    if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 105) this.killPlayer();
+    if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 105) this.damagePlayer(25);
   }
 
   private damageEnemiesInRadius(x: number, y: number, radius: number, damage: number) {
@@ -735,8 +737,19 @@ export class MissionScene extends Phaser.Scene {
     this.updateHud();
   }
 
+  private damagePlayer(amount: number) {
+    if (this.gameEnded || !this.player?.inputEnabled || this.player.isInvulnerable(this.time.now)) return;
+
+    const died = this.player.takeDamage(amount);
+    this.cameras.main.shake(amount >= 25 ? 180 : 80, amount >= 25 ? 0.007 : 0.003);
+    this.updateHud();
+
+    if (died) this.killPlayer();
+  }
+
   private killPlayer() {
     if (this.gameEnded || !this.player.inputEnabled || this.player.isInvulnerable(this.time.now)) return;
+    this.player.hp = 0;
     this.lives -= 1;
     this.player.knockOut();
     this.cameras.main.shake(250, 0.01);
@@ -791,6 +804,7 @@ export class MissionScene extends Phaser.Scene {
     const ammo = Number.isFinite(this.player?.ammo) ? this.player.ammo.toString().padStart(3, '0') : '∞';
     this.hudWeapon.setText(`WEAPON ${this.player ? WEAPONS[this.player.weapon].shortLabel : 'P'}  ${ammo}`);
     this.hudGrenades.setText(`GRENADE ${this.player?.grenades ?? 10}`);
+    this.hudHp.setText(`HP ${this.player?.hp ?? 50} / ${this.player?.maxHp ?? 50}`);
     this.hudLives.setText(`LIVES ${this.lives}`);
   }
 
