@@ -41,7 +41,7 @@ export class Player extends StickActor {
   private controls: Controls;
   private nextShotAt = 0;
   private moveSpeed = 230;
-  private jumpSpeed = 520;
+  private jumpSpeed = 690;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 0xf7fbff);
@@ -186,10 +186,12 @@ export class Player extends StickActor {
     if (this.grenades <= 0) return;
     this.grenades -= 1;
     this.scene.events.emit('player-grenade', {
-      x: this.x + this.facing * 18,
-      y: this.y - 20,
-      vx: this.facing * 350,
-      vy: -520,
+      // Spawn the grenade in front of the player and give it a strong
+      // forward impulse so the throw clearly follows the facing direction.
+      x: this.x + this.facing * 30,
+      y: this.y - 18,
+      vx: this.facing * 520,
+      vy: -360,
     } satisfies PlayerGrenadeEvent);
   }
 }

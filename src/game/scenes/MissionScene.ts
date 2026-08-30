@@ -322,7 +322,7 @@ export class MissionScene extends Phaser.Scene {
   private handlePlayerGrenade(event: PlayerGrenadeEvent) {
     if (this.gameEnded) return;
     const grenade = this.physics.add.image(event.x, event.y, 'grenade-player');
-    grenade.setBounce(0.48).setVelocity(event.vx, event.vy).setGravityY(950).setDepth(20);
+    grenade.setBounce(0.32).setVelocity(event.vx, event.vy).setGravityY(1000).setDepth(20);
     grenade.setData('kind', 'grenade-player');
     this.playerBullets.add(grenade);
     this.time.delayedCall(1050, () => grenade.active && this.explodePlayerGrenade(grenade));

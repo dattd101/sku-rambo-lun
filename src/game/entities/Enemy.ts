@@ -92,12 +92,23 @@ export class Enemy extends StickActor {
 
   takeDamage(amount: number) {
     if (!this.active) return;
+
     this.hp -= amount;
-    this.flash();
     if (this.hp <= 0) {
+      // Remove the bot from both rendering and physics immediately on the
+      // lethal hit. The kill event is still emitted for score/encounter flow.
+      this.hp = 0;
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      body.setVelocity(0, 0);
+      body.enable = false;
+      this.clearStick();
+      this.setActive(false).setVisible(false);
       this.scene.events.emit('enemy-killed', this);
       this.destroy();
+      return;
     }
+
+    this.flash();
   }
 
   private emitFire(targetX: number, targetY: number, kind: 'bullet' | 'grenade') {
