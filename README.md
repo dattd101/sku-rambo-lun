@@ -50,9 +50,9 @@ npm start
 - `D` / `→`: phải
 - `W` / `↑`: ngắm lên
 - `S` / `↓`: cúi
-- `Space`: nhảy
 - `J`: bắn
-- `K`: grenade
+- `K`: nhảy
+- `L`: ném bom
 - `Enter`: chơi lại sau Game Over / Mission Complete
 
 ## GitHub

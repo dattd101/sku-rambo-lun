@@ -5,7 +5,7 @@ export function ensureGameTextures(scene: Phaser.Scene) {
     scene.textures.createCanvas('actor-hitbox', 34, 74);
   }
 
-  makeCircle(scene, 'bullet-player', 10, 0xfff2a8);
+  makePlayerBullet(scene);
   makeCircle(scene, 'bullet-enemy', 10, 0xff6f6f);
   makeCircle(scene, 'grenade-player', 16, 0xd7e486);
   makeCircle(scene, 'grenade-enemy', 16, 0xffa06e);
@@ -33,6 +33,18 @@ export function ensureGameTextures(scene: Phaser.Scene) {
     g.generateTexture('pickup-crate', 52, 42);
     g.destroy();
   }
+}
+
+
+function makePlayerBullet(scene: Phaser.Scene) {
+  if (scene.textures.exists('bullet-player')) return;
+  const g = scene.add.graphics();
+  g.fillStyle(0xfff2a8, 1);
+  g.fillRoundedRect(1, 1, 16, 6, 3);
+  g.fillStyle(0xffffff, 1);
+  g.fillRoundedRect(5, 2, 10, 4, 2);
+  g.generateTexture('bullet-player', 18, 8);
+  g.destroy();
 }
 
 function makeCircle(scene: Phaser.Scene, key: string, size: number, color: number) {

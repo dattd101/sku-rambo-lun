@@ -277,14 +277,36 @@ export class MissionScene extends Phaser.Scene {
       const offset = count === 1 ? 0 : Phaser.Math.DegToRad(Phaser.Math.Linear(-spread, spread, i / (count - 1)));
       const angle = baseAngle + offset;
       const isRocket = config.projectile === 'rocket';
-      const projectile = this.physics.add.image(event.x, event.y, isRocket ? 'rocket' : 'bullet-player');
-      projectile.setDepth(20);
-      projectile.setData('kind', isRocket ? 'rocket' : 'bullet');
-      projectile.setData('damage', config.damage);
-      projectile.setVelocity(Math.cos(angle) * config.bulletSpeed, Math.sin(angle) * config.bulletSpeed);
-      projectile.setRotation(angle);
-      if (isRocket) projectile.body?.setSize(24, 10);
-      this.playerBullets.add(projectile);
+
+      // Create the projectile directly inside the Arcade Physics group.
+      // Velocity is applied AFTER the body is configured so Phaser cannot
+      // reset it when the object is attached to the group.
+      const projectile = this.playerBullets.create(
+        event.x,
+        event.y,
+        isRocket ? 'rocket' : 'bullet-player',
+      ) as Phaser.Physics.Arcade.Sprite;
+
+      const body = projectile.body as Phaser.Physics.Arcade.Body;
+      body.enable = true;
+      body.moves = true;
+      body.setAllowGravity(false);
+      body.setImmovable(false);
+
+      if (isRocket) body.setSize(24, 10, true);
+      else body.setSize(16, 8, true);
+
+      projectile
+        .setActive(true)
+        .setVisible(true)
+        .setDepth(20)
+        .setData('kind', isRocket ? 'rocket' : 'bullet')
+        .setData('damage', config.damage)
+        .setRotation(angle)
+        .setVelocity(
+          Math.cos(angle) * config.bulletSpeed,
+          Math.sin(angle) * config.bulletSpeed,
+        );
     }
 
     this.muzzleFlash(event.x, event.y);
@@ -351,10 +373,11 @@ export class MissionScene extends Phaser.Scene {
       return;
     }
 
-    const damage = Number(bullet.getData('damage') ?? 1);
+    // Regular enemies are intentionally one-hit kills for this mini build.
+    // Destroy the projectile first, then apply enough damage to guarantee death.
     bullet.destroy();
-    enemy.takeDamage(damage);
     this.hitSpark(enemy.x, enemy.y - 10);
+    enemy.takeDamage(Math.max(1, enemy.hp));
   }
 
   private hitBoss(bulletObj: Phaser.GameObjects.GameObject, bossObj: Phaser.GameObjects.GameObject) {

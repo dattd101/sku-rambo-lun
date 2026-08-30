@@ -23,9 +23,9 @@ export default function PlayPage() {
               <span><kbd>D</kbd>/<kbd>→</kbd> phải</span>
               <span><kbd>W</kbd>/<kbd>↑</kbd> ngắm lên</span>
               <span><kbd>S</kbd>/<kbd>↓</kbd> cúi</span>
-              <span><kbd>Space</kbd> nhảy</span>
               <span><kbd>J</kbd> bắn</span>
-              <span><kbd>K</kbd> grenade</span>
+              <span><kbd>K</kbd> nhảy</span>
+              <span><kbd>L</kbd> ném bom</span>
             </div>
           </div>
           <div className="panel">

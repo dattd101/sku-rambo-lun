@@ -14,7 +14,7 @@ export type EnemyFireEvent = {
 const STATS: Record<EnemyKind, { hp: number; speed: number; score: number; color: number }> = {
   soldier: { hp: 1, speed: 74, score: 100, color: 0xff6767 },
   grenadier: { hp: 1, speed: 52, score: 150, color: 0xffa25e },
-  turret: { hp: 5, speed: 0, score: 300, color: 0xc16cff },
+  turret: { hp: 1, speed: 0, score: 300, color: 0xc16cff },
 };
 
 export class Enemy extends StickActor {
