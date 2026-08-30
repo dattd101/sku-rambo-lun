@@ -25,5 +25,5 @@ export default function GameCanvas() {
     };
   }, []);
 
-  return <div ref={mountRef} className="gameMount" aria-label="SlugStick Mini game canvas" />;
+  return <div ref={mountRef} className="gameMount" aria-label="Rambo Lùn game canvas" />;
 }

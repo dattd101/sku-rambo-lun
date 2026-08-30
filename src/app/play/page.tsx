@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import GameClient from '@/components/game/GameClient';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function PlayPage() {
   return (
@@ -8,9 +9,12 @@ export default function PlayPage() {
         <header className="playHeader">
           <div>
             <div className="eyebrow">Mission 01</div>
-            <h1>SlugStick Mini</h1>
+            <h1>RAMBO LÙN</h1>
           </div>
-          <Link className="backLink" href="/">← Trang chủ</Link>
+          <div className="playHeaderActions">
+            <ThemeToggle />
+            <Link className="backLink" href="/">← Trang chủ</Link>
+          </div>
         </header>
 
         <GameClient />

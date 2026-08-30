@@ -101,11 +101,11 @@ export class Player extends StickActor {
     this.x = Phaser.Math.Clamp(this.x, minX, maxX);
 
     if (this.controls.fire.isDown) this.tryFire(now, horizontal, up, down);
-    if (Phaser.Input.Keyboard.JustDown(this.controls.grenade)) this.tryGrenade();
+    if (Phaser.Input.Keyboard.JustDown(this.controls.grenade)) this.tryGrenade(now);
 
     const invulnerable = now < this.invulnerableUntil;
-    if (invulnerable) this.stick.setAlpha(Math.floor(now / 90) % 2 === 0 ? 0.25 : 1);
-    else this.stick.setAlpha(1);
+    if (invulnerable) this.setVisualAlpha(Math.floor(now / 90) % 2 === 0 ? 0.25 : 1);
+    else this.setVisualAlpha(1);
 
     this.drawStick(now, 'player');
   }
@@ -124,7 +124,7 @@ export class Player extends StickActor {
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.enable = true;
     this.invulnerableUntil = now + 1500;
-    this.stick.setAlpha(1);
+    this.setVisualAlpha(1);
   }
 
   knockOut() {
@@ -161,6 +161,8 @@ export class Player extends StickActor {
     const muzzleX = this.x + dx * 25;
     const muzzleY = this.y - 9 + dy * 28 + (crouching ? 14 : 0);
 
+    this.triggerFireVisual(now);
+
     this.scene.events.emit('player-fire', {
       weapon: this.weapon,
       x: muzzleX,
@@ -182,9 +184,10 @@ export class Player extends StickActor {
     }
   }
 
-  private tryGrenade() {
+  private tryGrenade(now: number) {
     if (this.grenades <= 0) return;
     this.grenades -= 1;
+    this.triggerGrenadeVisual(now);
     this.scene.events.emit('player-grenade', {
       // Spawn the grenade in front of the player and give it a strong
       // forward impulse so the throw clearly follows the facing direction.

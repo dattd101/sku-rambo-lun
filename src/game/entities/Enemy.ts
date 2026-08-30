@@ -20,8 +20,10 @@ const STATS: Record<EnemyKind, { hp: number; speed: number; score: number; color
 export class Enemy extends StickActor {
   readonly kind: EnemyKind;
   hp: number;
+  dead = false;
   readonly scoreValue: number;
   private nextAttackAt = 0;
+  private attackVisualUntil = 0;
 
   constructor(scene: Phaser.Scene, kind: EnemyKind, x: number, y: number) {
     const stats = STATS[kind];
@@ -30,15 +32,13 @@ export class Enemy extends StickActor {
     this.hp = stats.hp;
     this.scoreValue = stats.score;
 
-    if (kind === 'soldier') this.setWeaponVisual('pistol');
-    if (kind === 'grenadier') this.setWeaponVisual('shotgun');
-    if (kind === 'turret') this.setWeaponVisual('hmg');
-
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (kind === 'turret') {
+      // Turret keeps its old stationary AI, but now uses the supplied bot
+      // shooting pose instead of the old vector turret drawing.
       body.setAllowGravity(false);
       body.setImmovable(true);
-      body.setSize(52, 48).setOffset(-9, 20);
+      body.setSize(34, 66).setOffset(0, 6);
     } else {
       body.setGravityY(1450);
       body.setMaxVelocity(150, 900);
@@ -46,7 +46,7 @@ export class Enemy extends StickActor {
   }
 
   updateAI(now: number, playerX: number, playerY: number) {
-    if (!this.active) return;
+    if (!this.active || this.dead) return;
     const body = this.body as Phaser.Physics.Arcade.Body;
     const dx = playerX - this.x;
     const distance = Math.abs(dx);
@@ -54,13 +54,16 @@ export class Enemy extends StickActor {
 
     if (this.kind === 'turret') {
       body.setVelocity(0, 0);
-      this.drawTurret(now);
       if (distance < 560 && now >= this.nextAttackAt) {
         this.nextAttackAt = now + 900;
+        this.attackVisualUntil = now + 420;
         this.emitFire(playerX, playerY - 10, 'bullet');
         this.scene.time.delayedCall(120, () => this.active && this.emitFire(playerX, playerY - 10, 'bullet'));
         this.scene.time.delayedCall(240, () => this.active && this.emitFire(playerX, playerY - 10, 'bullet'));
       }
+
+      this.setEnemyVisualPose(now < this.attackVisualUntil ? 'shoot' : 'side');
+      this.drawStick(now, 'enemy');
       return;
     }
 
@@ -71,6 +74,7 @@ export class Enemy extends StickActor {
       if (distance <= 380 && now >= this.nextAttackAt) {
         body.setVelocityX(0);
         this.nextAttackAt = now + Phaser.Math.Between(900, 1250);
+        this.attackVisualUntil = now + 220;
         this.emitFire(playerX, playerY - 8, 'bullet');
       }
     }
@@ -82,27 +86,39 @@ export class Enemy extends StickActor {
       if (distance <= 560 && distance >= 150 && now >= this.nextAttackAt) {
         body.setVelocityX(0);
         this.nextAttackAt = now + Phaser.Math.Between(1500, 2100);
+        this.attackVisualUntil = now + 420;
         this.emitFire(playerX, playerY, 'grenade');
       }
     }
 
     this.setPose(false, false);
+    if (now < this.attackVisualUntil) {
+      this.setEnemyVisualPose(this.kind === 'grenadier' ? 'grenade' : 'shoot');
+    } else {
+      this.setEnemyVisualPose('side');
+    }
     this.drawStick(now, 'enemy');
   }
 
   takeDamage(amount: number) {
-    if (!this.active) return;
+    if (!this.active || this.dead) return;
 
     this.hp -= amount;
     if (this.hp <= 0) {
-      // Remove the bot from both rendering and physics immediately on the
-      // lethal hit. The kill event is still emitted for score/encounter flow.
+      // Mark dead before emitting anything so every collision callback can
+      // reject this bot immediately in the same physics tick.
       this.hp = 0;
+      this.dead = true;
+
       const body = this.body as Phaser.Physics.Arcade.Body;
       body.setVelocity(0, 0);
       body.enable = false;
+
       this.clearStick();
       this.setActive(false).setVisible(false);
+
+      // The scene removes this object from the enemies group synchronously.
+      // Destroy happens after the score/encounter handler has read x/y/value.
       this.scene.events.emit('enemy-killed', this);
       this.destroy();
       return;
@@ -112,9 +128,10 @@ export class Enemy extends StickActor {
   }
 
   private emitFire(targetX: number, targetY: number, kind: 'bullet' | 'grenade') {
+    const isGrenade = kind === 'grenade';
     this.scene.events.emit('enemy-fire', {
-      x: this.x + this.facing * 22,
-      y: this.y - 10,
+      x: this.x + this.facing * (isGrenade ? 22 : 36),
+      y: this.y + (isGrenade ? -24 : -10),
       targetX,
       targetY,
       kind,
@@ -122,18 +139,7 @@ export class Enemy extends StickActor {
   }
 
   private flash() {
-    this.stick.setAlpha(0.2);
-    this.scene.time.delayedCall(60, () => this.active && this.stick.setAlpha(1));
-  }
-
-  private drawTurret(now: number) {
-    const dir = this.facing;
-    this.stick.clear();
-    this.stick.fillStyle(0x4d3d65, 1);
-    this.stick.fillRoundedRect(this.x - 26, this.y - 12, 52, 34, 5);
-    this.stick.lineStyle(6, this.stickColor, 1);
-    this.stick.lineBetween(this.x, this.y - 7, this.x + 36 * dir, this.y - 18);
-    this.stick.fillStyle(this.stickColor, 1);
-    this.stick.fillCircle(this.x, this.y - 8, 8 + Math.sin(now * 0.01) * 0.4);
+    this.setVisualAlpha(0.2);
+    this.scene.time.delayedCall(60, () => this.active && this.setVisualAlpha(1));
   }
 }

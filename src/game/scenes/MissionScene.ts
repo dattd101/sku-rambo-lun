@@ -47,6 +47,27 @@ export class MissionScene extends Phaser.Scene {
     super('mission');
   }
 
+  preload() {
+    const base = '/assets/player';
+    this.load.image('player-idle-side', `${base}/idle-side.png`);
+    this.load.image('player-run-1', `${base}/run-1.png`);
+    this.load.image('player-run-2', `${base}/run-2.png`);
+    this.load.image('player-run-3', `${base}/run-3.png`);
+    this.load.image('player-jump', `${base}/jump.png`);
+    this.load.image('player-crouch', `${base}/crouch.png`);
+    this.load.image('player-pistol-ready', `${base}/pistol-ready.png`);
+    this.load.image('player-pistol-fire', `${base}/pistol-fire.png`);
+    this.load.image('player-grenade-ready', `${base}/grenade-ready.png`);
+    this.load.image('player-grenade-throw', `${base}/grenade-throw.png`);
+    this.load.image('player-hurt', `${base}/hurt.png`);
+
+    const enemyBase = '/assets/enemy';
+    this.load.image('enemy-side', `${enemyBase}/side.png`);
+    this.load.image('enemy-shoot', `${enemyBase}/shoot.png`);
+    this.load.image('enemy-grenade', `${enemyBase}/grenade.png`);
+    this.load.image('enemy-jump', `${enemyBase}/jump.png`);
+  }
+
   create() {
     ensureGameTextures(this);
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, GAME_HEIGHT + 400);
@@ -68,7 +89,7 @@ export class MissionScene extends Phaser.Scene {
     this.physics.add.collider(this.playerBullets, this.platforms, this.playerBulletHitsWorld, undefined, this);
     this.physics.add.overlap(this.player, this.enemyBullets, this.enemyBulletHitsPlayer, undefined, this);
     this.physics.add.collider(this.enemyBullets, this.platforms, this.enemyBulletHitsWorld, undefined, this);
-    this.physics.add.overlap(this.player, this.enemies, () => this.killPlayer(), undefined, this);
+    this.physics.add.overlap(this.player, this.enemies, this.playerTouchesEnemy, undefined, this);
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.setDeadzone(360, 180);
@@ -382,7 +403,6 @@ export class MissionScene extends Phaser.Scene {
     // Regular enemies are intentionally one-hit kills for this mini build.
     // Destroy the projectile first, then apply enough damage to guarantee death.
     bullet.destroy();
-    this.hitSpark(enemy.x, enemy.y - 10);
     enemy.takeDamage(Math.max(1, enemy.hp));
   }
 
@@ -464,14 +484,30 @@ export class MissionScene extends Phaser.Scene {
   }
 
   private handleEnemyKilled(enemy: Enemy) {
-    this.score += enemy.scoreValue;
+    const scoreValue = enemy.scoreValue;
+
+    // Remove the dead bot from the Arcade group immediately. This prevents
+    // an invisible/disabled bot from participating in Player↔Enemy overlap
+    // checks on a later frame.
+    this.enemies.remove(enemy, false, false);
+
+    this.score += scoreValue;
     this.activeEnemies = Math.max(0, this.activeEnemies - 1);
-    this.explosionFx(enemy.x, enemy.y, 42, false);
     this.updateHud();
 
     if (this.activeEncounter && !this.activeEncounter.boss && this.activeEnemies === 0) {
       this.time.delayedCall(450, () => this.finishEncounter());
     }
+  }
+
+  private playerTouchesEnemy(_playerObj: ArcadePhysicsObject, enemyObj: ArcadePhysicsObject) {
+    const enemy = enemyObj as unknown as Enemy;
+    if (!enemy || !enemy.active || enemy.dead) return;
+
+    const body = enemy.body as Phaser.Physics.Arcade.Body | null;
+    if (!body || !body.enable) return;
+
+    this.killPlayer();
   }
 
   private handleBossKilled() {
@@ -630,7 +666,8 @@ export class MissionScene extends Phaser.Scene {
 
   private readHighScore() {
     try {
-      const value = window.localStorage.getItem('slugstick-high-score');
+      const value = window.localStorage.getItem('rambo-lun-high-score')
+        ?? window.localStorage.getItem('slugstick-high-score');
       this.highScore = value ? Number(value) || 0 : 0;
     } catch {
       this.highScore = 0;
@@ -640,7 +677,7 @@ export class MissionScene extends Phaser.Scene {
   private saveHighScore() {
     this.highScore = Math.max(this.highScore, this.score);
     try {
-      window.localStorage.setItem('slugstick-high-score', String(this.highScore));
+      window.localStorage.setItem('rambo-lun-high-score', String(this.highScore));
     } catch {
       // localStorage may be unavailable in privacy-restricted contexts; gameplay still works.
     }

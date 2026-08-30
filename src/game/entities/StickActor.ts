@@ -2,6 +2,28 @@ import Phaser from 'phaser';
 import type { WeaponId } from '@/game/config/weapons';
 
 export type StickColor = number;
+export type EnemyVisualPose = 'side' | 'shoot' | 'grenade' | 'jump';
+
+const PLAYER_HEIGHTS: Record<string, number> = {
+  'player-idle-side': 92,
+  'player-run-1': 82,
+  'player-run-2': 82,
+  'player-run-3': 82,
+  'player-jump': 86,
+  'player-crouch': 68,
+  'player-pistol-ready': 78,
+  'player-pistol-fire': 78,
+  'player-grenade-ready': 78,
+  'player-grenade-throw': 78,
+  'player-hurt': 72,
+};
+
+const ENEMY_HEIGHTS: Record<EnemyVisualPose, number> = {
+  side: 82,
+  shoot: 78,
+  grenade: 80,
+  jump: 82,
+};
 
 export class StickActor extends Phaser.Physics.Arcade.Sprite {
   protected stick: Phaser.GameObjects.Graphics;
@@ -10,6 +32,14 @@ export class StickActor extends Phaser.Physics.Arcade.Sprite {
   protected crouching = false;
   protected aimingUp = false;
   protected weaponVisual: WeaponId = 'pistol';
+  protected enemyVisualPose: EnemyVisualPose = 'side';
+
+  private playerImage: Phaser.GameObjects.Image;
+  private enemyImage: Phaser.GameObjects.Image;
+  private weaponOverlay: Phaser.GameObjects.Graphics;
+  private visualAlpha = 1;
+  private fireVisualUntil = 0;
+  private grenadeVisualUntil = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, color: StickColor) {
     super(scene, x, y, 'actor-hitbox');
@@ -20,6 +50,16 @@ export class StickActor extends Phaser.Physics.Arcade.Sprite {
     this.setVisible(false);
 
     this.stick = scene.add.graphics().setDepth(10);
+    this.playerImage = scene.add.image(x, y, 'player-idle-side')
+      .setOrigin(0.5, 1)
+      .setDepth(12)
+      .setVisible(false);
+    this.enemyImage = scene.add.image(x, y, 'enemy-side')
+      .setOrigin(0.5, 1)
+      .setDepth(11)
+      .setVisible(false);
+    this.weaponOverlay = scene.add.graphics().setDepth(13).setVisible(false);
+
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(28, 68).setOffset(3, 4);
   }
@@ -40,128 +80,122 @@ export class StickActor extends Phaser.Physics.Arcade.Sprite {
     this.weaponVisual = weapon;
   }
 
+  protected setEnemyVisualPose(pose: EnemyVisualPose) {
+    this.enemyVisualPose = pose;
+  }
+
+  protected setVisualAlpha(alpha: number) {
+    this.visualAlpha = alpha;
+    this.playerImage.setAlpha(alpha);
+    this.enemyImage.setAlpha(alpha);
+    this.weaponOverlay.setAlpha(alpha);
+    this.stick.setAlpha(alpha);
+  }
+
+  protected triggerFireVisual(now: number) {
+    this.fireVisualUntil = Math.max(this.fireVisualUntil, now + 95);
+  }
+
+  protected triggerGrenadeVisual(now: number) {
+    this.grenadeVisualUntil = Math.max(this.grenadeVisualUntil, now + 260);
+  }
+
   drawStick(now: number, variant: 'player' | 'enemy' = 'enemy') {
     if (!this.active) return;
 
-    const body = this.body as Phaser.Physics.Arcade.Body;
-    const speed = Math.abs(body.velocity.x);
-    const moving = speed > 15 && body.blocked.down;
-    const phase = moving ? Math.sin(now * 0.022) : 0;
-    const x = this.x;
-    const y = this.y;
-    const dir = this.facing;
-    const headY = this.crouching ? y - 16 : y - 31;
-    const shoulderX = x + 2 * dir;
-    const shoulderY = this.crouching ? y - 6 : y - 11;
-    const hipX = x - 1 * dir;
-    const hipY = this.crouching ? y + 10 : y + 12;
-
-    this.stick.clear();
-
-    // body silhouette
-    this.stick.lineStyle(14, this.stickColor, 1);
-    this.stick.strokeLineShape(new Phaser.Geom.Line(shoulderX, shoulderY, hipX, hipY));
-
-    // head and cap
-    this.stick.fillStyle(this.stickColor, 1);
-    this.stick.fillCircle(x, headY, 11);
     if (variant === 'player') {
-      this.stick.fillTriangle(
-        x + 6 * dir,
-        headY - 4,
-        x + 22 * dir,
-        headY + 2,
-        x + 6 * dir,
-        headY + 7,
-      );
-      this.stick.fillRect(x - 6, headY - 15, 12, 4);
+      this.stick.clear();
+      this.enemyImage.setVisible(false);
+      this.drawPlayerSprite(now);
+      return;
     }
 
-    // torso bulk
-    this.stick.fillRoundedRect(x - 12, shoulderY - 3, 24, this.crouching ? 20 : 30, 8);
+    this.playerImage.setVisible(false);
+    this.weaponOverlay.clear().setVisible(false);
+    this.stick.clear();
+    this.drawEnemySprite(now);
+  }
 
-    if (this.crouching) {
-      this.drawCrouchPose(x, y, dir, phase, variant);
+  private drawPlayerSprite(now: number) {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    const moving = Math.abs(body.velocity.x) > 15 && body.blocked.down;
+    const airborne = !body.blocked.down;
+    const grenadePose = now < this.grenadeVisualUntil;
+    const firePose = now < this.fireVisualUntil;
+
+    let textureKey = 'player-idle-side';
+
+    if (grenadePose) {
+      textureKey = 'player-grenade-throw';
+    } else if (airborne) {
+      textureKey = 'player-jump';
+    } else if (this.crouching) {
+      textureKey = 'player-crouch';
+    } else if (moving) {
+      const frame = Math.floor(now / 95) % 3;
+      textureKey = frame === 0 ? 'player-run-1' : frame === 1 ? 'player-run-2' : 'player-run-3';
+    } else if (this.weaponVisual === 'pistol' && !this.aimingUp) {
+      textureKey = firePose ? 'player-pistol-fire' : 'player-pistol-ready';
+    }
+
+    this.playerImage
+      .setTexture(textureKey)
+      .setPosition(this.x, this.y + 38)
+      .setFlipX(this.facing < 0)
+      .setAlpha(this.visualAlpha)
+      .setVisible(true);
+
+    const source = this.scene.textures.get(textureKey).getSourceImage() as { height?: number };
+    const sourceHeight = Math.max(1, Number(source?.height ?? 1));
+    const targetHeight = PLAYER_HEIGHTS[textureKey] ?? 82;
+    this.playerImage.setScale(targetHeight / sourceHeight);
+
+    this.weaponOverlay.clear();
+    if (grenadePose) {
+      this.weaponOverlay.setVisible(false);
+      return;
+    }
+
+    // Pistol-ready/fire source frames already contain the gun. All other
+    // movement poses get a small weapon overlay so the currently equipped
+    // weapon remains visible while running, jumping and crouching.
+    const textureAlreadyHasPistol =
+      this.weaponVisual === 'pistol' &&
+      (textureKey === 'player-pistol-ready' || textureKey === 'player-pistol-fire');
+
+    if (!textureAlreadyHasPistol) {
+      this.weaponOverlay.setVisible(true).setAlpha(this.visualAlpha);
+      this.drawWeaponOverlay();
     } else {
-      this.drawStandPose(x, y, dir, phase, variant, moving);
+      this.weaponOverlay.setVisible(false);
     }
   }
 
-  private drawStandPose(
-    x: number,
-    y: number,
-    dir: 1 | -1,
-    phase: number,
-    variant: 'player' | 'enemy',
-    moving: boolean,
-  ) {
-    const shoulderX = x + 2 * dir;
-    const shoulderY = y - 10;
-    const handFrontX = this.aimingUp ? x + 10 * dir : x + 20 * dir;
-    const handFrontY = this.aimingUp ? y - 28 : y - 8;
-    const handRearX = this.aimingUp ? x - 1 * dir : x + 8 * dir;
-    const handRearY = this.aimingUp ? y - 18 : y - 4;
+  private drawEnemySprite(now: number) {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    const moving = Math.abs(body.velocity.x) > 8;
+    const pose = this.enemyVisualPose;
+    const textureKey = `enemy-${pose}`;
+    const bob = pose === 'side' && moving ? Math.sin(now * 0.025) * 1.5 : 0;
 
-    // arms
-    this.stick.lineStyle(10, this.stickColor, 1);
-    this.stick.strokeLineShape(new Phaser.Geom.Line(shoulderX, shoulderY, handFrontX, handFrontY));
-    this.stick.strokeLineShape(new Phaser.Geom.Line(shoulderX - 2 * dir, shoulderY + 3, handRearX, handRearY));
+    this.enemyImage
+      .setTexture(textureKey)
+      .setPosition(this.x, this.y + 38 + bob)
+      .setFlipX(this.facing < 0)
+      .setAlpha(this.visualAlpha)
+      .setVisible(true);
 
-    // legs
-    const frontFootX = x + 12 * dir + (moving ? phase * 12 : 0);
-    const rearFootX = x - 12 * dir - (moving ? phase * 9 : 0);
-    this.stick.lineStyle(12, this.stickColor, 1);
-    this.stick.strokeLineShape(new Phaser.Geom.Line(x - 2 * dir, y + 11, frontFootX, y + 36));
-    this.stick.strokeLineShape(new Phaser.Geom.Line(x - 4 * dir, y + 11, rearFootX, y + 36));
-
-    this.drawWeapon(
-      x + 12 * dir,
-      this.aimingUp ? y - 22 : y - 9,
-      dir,
-      this.aimingUp,
-      variant,
-    );
+    const source = this.scene.textures.get(textureKey).getSourceImage() as { height?: number };
+    const sourceHeight = Math.max(1, Number(source?.height ?? 1));
+    this.enemyImage.setScale(ENEMY_HEIGHTS[pose] / sourceHeight);
   }
 
-  private drawCrouchPose(
-    x: number,
-    y: number,
-    dir: 1 | -1,
-    _phase: number,
-    variant: 'player' | 'enemy',
-  ) {
-    // kneeling silhouette similar to the reference
-    const shoulderX = x + 2 * dir;
-    const shoulderY = y - 8;
-    const handFrontX = x + 18 * dir;
-    const handFrontY = y - 10;
-    const handRearX = x + 6 * dir;
-    const handRearY = y - 1;
-
-    this.stick.lineStyle(10, this.stickColor, 1);
-    this.stick.strokeLineShape(new Phaser.Geom.Line(shoulderX, shoulderY, handFrontX, handFrontY));
-    this.stick.strokeLineShape(new Phaser.Geom.Line(shoulderX - 2 * dir, shoulderY + 3, handRearX, handRearY));
-
-    // front knee up
-    this.stick.lineStyle(12, this.stickColor, 1);
-    this.stick.strokeLineShape(new Phaser.Geom.Line(x - 2 * dir, y + 10, x + 10 * dir, y + 19));
-    this.stick.strokeLineShape(new Phaser.Geom.Line(x + 10 * dir, y + 19, x + 22 * dir, y + 19));
-
-    // rear knee down
-    this.stick.strokeLineShape(new Phaser.Geom.Line(x - 4 * dir, y + 10, x - 14 * dir, y + 22));
-    this.stick.strokeLineShape(new Phaser.Geom.Line(x - 14 * dir, y + 22, x - 20 * dir, y + 26));
-
-    this.drawWeapon(x + 12 * dir, y - 9, dir, false, variant);
-  }
-
-  private drawWeapon(
-    baseX: number,
-    baseY: number,
-    dir: 1 | -1,
-    aimingUp: boolean,
-    _variant: 'player' | 'enemy',
-  ) {
-    const angle = aimingUp ? -Math.PI / 3 : 0;
+  private drawWeaponOverlay() {
+    const dir = this.facing;
+    const crouchOffset = this.crouching ? 13 : 0;
+    const baseX = this.x + 7 * dir;
+    const baseY = this.y - 7 + crouchOffset;
+    const angle = this.aimingUp && !this.crouching ? -Math.PI / 2 : 0;
     const cos = Math.cos(angle) * dir;
     const sin = Math.sin(angle);
     const crossX = -sin;
@@ -174,31 +208,19 @@ export class StickActor extends Phaser.Physics.Arcade.Sprite {
       const wy = (thickness / 2) * crossY;
       const cx = baseX + forward * cos + sideways * crossX;
       const cy = baseY + forward * sin + sideways * crossY;
-      const points = [
+      this.weaponOverlay.fillStyle(color, 1);
+      this.weaponOverlay.fillPoints([
         new Phaser.Math.Vector2(cx - hx - wx, cy - hy - wy),
         new Phaser.Math.Vector2(cx + hx - wx, cy + hy - wy),
         new Phaser.Math.Vector2(cx + hx + wx, cy + hy + wy),
         new Phaser.Math.Vector2(cx - hx + wx, cy - hy + wy),
-      ];
-      this.stick.fillStyle(color, 1);
-      this.stick.fillPoints(points, true);
+      ], true);
     };
 
-    const addTriangle = (forward: number, width: number, length: number, color = 0x18161b) => {
-      const tipX = baseX + (forward + length) * cos;
-      const tipY = baseY + (forward + length) * sin;
-      const leftX = baseX + forward * cos + (width / 2) * crossX;
-      const leftY = baseY + forward * sin + (width / 2) * crossY;
-      const rightX = baseX + forward * cos - (width / 2) * crossX;
-      const rightY = baseY + forward * sin - (width / 2) * crossY;
-      this.stick.fillStyle(color, 1);
-      this.stick.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY);
-    };
-
-    const addGrip = (forward: number, sideways: number, length: number, thickness: number, color = 0x18161b) => {
-      const ang = angle + (dir === 1 ? Math.PI / 2.8 : -Math.PI / 2.8);
-      const c = Math.cos(ang);
-      const s = Math.sin(ang);
+    const addGrip = (forward: number, sideways: number, length: number, thickness: number) => {
+      const gripAngle = angle + (dir === 1 ? Math.PI / 2.8 : -Math.PI / 2.8);
+      const c = Math.cos(gripAngle);
+      const s = Math.sin(gripAngle);
       const ccx = -s;
       const ccy = c;
       const hx = (length / 2) * c;
@@ -207,54 +229,53 @@ export class StickActor extends Phaser.Physics.Arcade.Sprite {
       const wy = (thickness / 2) * ccy;
       const cx = baseX + forward * cos + sideways * crossX;
       const cy = baseY + forward * sin + sideways * crossY;
-      const points = [
+      this.weaponOverlay.fillStyle(0x18161b, 1);
+      this.weaponOverlay.fillPoints([
         new Phaser.Math.Vector2(cx - hx - wx, cy - hy - wy),
         new Phaser.Math.Vector2(cx + hx - wx, cy + hy - wy),
         new Phaser.Math.Vector2(cx + hx + wx, cy + hy + wy),
         new Phaser.Math.Vector2(cx - hx + wx, cy - hy + wy),
-      ];
-      this.stick.fillStyle(color, 1);
-      this.stick.fillPoints(points, true);
+      ], true);
     };
 
     switch (this.weaponVisual) {
       case 'pistol':
-        addRect(8, 0, 14, 6);
-        addRect(14, 0, 7, 5);
-        addGrip(5, 3, 10, 5);
+        addRect(10, 0, 18, 6);
+        addGrip(4, 3, 10, 5);
         break;
       case 'hmg':
-        addRect(16, 0, 34, 8);
-        addRect(31, 0, 10, 4);
-        addRect(5, -1, 9, 7);
+        addRect(18, 0, 36, 8);
+        addRect(36, 0, 11, 4);
         addGrip(10, 4, 15, 6);
-        addRect(4, 6, 18, 4, 0x2c2a30);
+        addRect(6, 6, 18, 4, 0x3a363b);
         break;
       case 'shotgun':
-        addRect(18, 0, 32, 7);
-        addRect(32, 0, 12, 3);
-        addRect(5, 1, 12, 7, 0x2c2a30);
-        addGrip(11, 4, 12, 5);
+        addRect(20, 0, 40, 7);
+        addRect(40, 0, 14, 3);
+        addRect(7, 1, 12, 7, 0x5b4435);
+        addGrip(12, 4, 12, 5);
         break;
       case 'rocket':
-        addRect(18, 0, 30, 9);
-        addRect(35, 0, 8, 5);
-        addTriangle(33, 10, 9);
-        addRect(6, 0, 12, 9, 0x2c2a30);
-        break;
-      default:
-        addRect(16, 0, 32, 8);
-        addGrip(10, 4, 12, 5);
+        addRect(20, 0, 39, 10, 0x33453b);
+        addRect(41, 0, 10, 6, 0x18161b);
+        addRect(6, 0, 12, 10, 0x5b674c);
+        addGrip(15, 5, 12, 5);
         break;
     }
   }
 
   protected clearStick() {
     this.stick.clear();
+    this.playerImage.setVisible(false);
+    this.enemyImage.setVisible(false);
+    this.weaponOverlay.clear().setVisible(false);
   }
 
   override destroy(fromScene?: boolean) {
     this.stick.destroy();
+    this.playerImage.destroy();
+    this.enemyImage.destroy();
+    this.weaponOverlay.destroy();
     super.destroy(fromScene);
   }
 }

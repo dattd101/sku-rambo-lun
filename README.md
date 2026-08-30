@@ -1,4 +1,4 @@
-# SlugStick Mini
+# Rambo Lùn
 
 Mini run-and-gun 2D bằng **Next.js 15 + Phaser 3 + TypeScript**. Toàn bộ art trong bản MVP được vẽ bằng Phaser Graphics / shape, không dùng sprite, sound, logo hoặc map asset của Metal Slug.
 
@@ -62,7 +62,7 @@ Tạo repo trống trên GitHub rồi chạy:
 ```bash
 git init
 git add .
-git commit -m "Initial SlugStick Mini"
+git commit -m "Initial Rambo Lùn"
 git branch -M main
 git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main
