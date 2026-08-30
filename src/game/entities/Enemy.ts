@@ -14,7 +14,7 @@ export type EnemyFireEvent = {
 const STATS: Record<EnemyKind, { hp: number; speed: number; score: number; color: number }> = {
   soldier: { hp: 1, speed: 82, score: 100, color: 0xff6767 },
   grenadier: { hp: 1, speed: 68, score: 150, color: 0xffa25e },
-  turret: { hp: 1, speed: 0, score: 300, color: 0xc16cff },
+  turret: { hp: 1, speed: 72, score: 300, color: 0xc16cff },
 };
 
 export class Enemy extends StickActor {
@@ -29,6 +29,8 @@ export class Enemy extends StickActor {
   private attackVisualUntil = 0;
   private grenadeAttackVisualUntil = 0;
   private jumpAttackUntil = 0;
+  private strafeDirection: 1 | -1 = 1;
+  private nextStrafeTurnAt = 0;
 
   constructor(scene: Phaser.Scene, kind: EnemyKind, x: number, y: number) {
     const stats = STATS[kind];
@@ -42,17 +44,17 @@ export class Enemy extends StickActor {
     this.nextGunAt = now + Phaser.Math.Between(450, 900);
     this.nextGrenadeAt = now + Phaser.Math.Between(1100, 1800);
     this.nextJumpAt = now + Phaser.Math.Between(900, 1700);
+    this.strafeDirection = Math.random() > 0.5 ? 1 : -1;
+    this.nextStrafeTurnAt = now + Phaser.Math.Between(550, 1100);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(34, 66).setOffset(0, 6);
 
-    if (kind === 'turret') {
-      body.setAllowGravity(false);
-      body.setImmovable(true);
-    } else {
-      body.setGravityY(1450);
-      body.setMaxVelocity(230, 980);
-    }
+    // Every enemy entry is rendered as a humanoid bot in this build, including
+    // the old 'turret' slots from the level data. Give all of them normal
+    // gravity and movement so no bot remains planted in one place.
+    body.setGravityY(1450);
+    body.setMaxVelocity(230, 980);
   }
 
   updateAI(now: number, playerX: number, playerY: number) {
@@ -66,26 +68,27 @@ export class Enemy extends StickActor {
 
     this.setFacing(direction);
 
-    if (this.kind === 'turret') {
-      body.setVelocity(0, 0);
-      this.updateStationaryAttacks(now, playerX, playerY, distance);
-      this.drawEnemyByState(now, false);
-      return;
-    }
-
-    // Move toward the player, but keep a little shooting distance.
+    // Humanoid bots keep moving at all times while grounded. They advance
+    // when far away, retreat when too close, and strafe around the player in
+    // the preferred firing range instead of stopping in place.
     if (grounded) {
-      if (distance > 310 && distance < 820) {
-        body.setVelocityX(direction * STATS[this.kind].speed);
+      const speed = STATS[this.kind].speed;
+
+      if (distance > 285) {
+        body.setVelocityX(direction * speed);
       } else if (distance < 145) {
-        body.setVelocityX(-direction * STATS[this.kind].speed * 0.7);
+        body.setVelocityX(-direction * speed);
       } else {
-        body.setVelocityX(0);
+        if (now >= this.nextStrafeTurnAt) {
+          this.strafeDirection = this.strafeDirection === 1 ? -1 : 1;
+          this.nextStrafeTurnAt = now + Phaser.Math.Between(500, 950);
+        }
+        body.setVelocityX(this.strafeDirection * speed * 0.9);
       }
     }
 
     // Every humanoid bot can jump. During the jump it also shoots and throws a grenade.
-    if (grounded && distance < 690 && distance > 110 && now >= this.nextJumpAt) {
+    if (grounded && distance < 820 && distance > 90 && now >= this.nextJumpAt) {
       this.startJumpAttack(now, direction, playerX, playerY);
     }
 
@@ -158,22 +161,25 @@ export class Enemy extends StickActor {
 
   private startJumpAttack(now: number, direction: number, playerX: number, playerY: number) {
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setVelocity(direction * (STATS[this.kind].speed + 95), -590);
+    body.setVelocity(direction * (STATS[this.kind].speed + 110), -610);
 
-    this.jumpAttackUntil = now + 900;
-    this.nextJumpAt = now + Phaser.Math.Between(1900, 3200);
+    this.jumpAttackUntil = now + 980;
+    this.nextJumpAt = now + Phaser.Math.Between(1800, 2900);
 
-    // Fire shortly after leaving the ground, then throw while still airborne.
-    this.scene.time.delayedCall(100, () => {
+    // Reserve the normal cooldown slots before scheduling the airborne combo,
+    // so updateCombat cannot replace these two guaranteed attacks.
+    this.nextGunAt = Math.max(this.nextGunAt, now + 760);
+    this.nextGrenadeAt = Math.max(this.nextGrenadeAt, now + 1450);
+
+    // Every jump ALWAYS performs both attacks: gun first, grenade second.
+    this.scene.time.delayedCall(120, () => {
       if (!this.active || this.dead) return;
       this.fireGun(this.scene.time.now, playerX, playerY);
-      this.nextGunAt = Math.max(this.nextGunAt, this.scene.time.now + 620);
     });
 
-    this.scene.time.delayedCall(360, () => {
+    this.scene.time.delayedCall(390, () => {
       if (!this.active || this.dead) return;
       this.throwGrenade(this.scene.time.now, playerX, playerY);
-      this.nextGrenadeAt = Math.max(this.nextGrenadeAt, this.scene.time.now + 1200);
     });
   }
 

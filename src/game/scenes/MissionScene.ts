@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { Player, type PlayerFireEvent, type PlayerGrenadeEvent } from '@/game/entities/Player';
 import { Enemy, type EnemyFireEvent } from '@/game/entities/Enemy';
-import { Boss } from '@/game/entities/Boss';
+import { Boss, type BossDodgeThreat } from '@/game/entities/Boss';
 import { ENCOUNTERS, FLOOR_TOP, GAME_HEIGHT, GAME_WIDTH, WORLD_WIDTH, type Encounter } from '@/game/config/level';
 import { WEAPONS, type WeaponId } from '@/game/config/weapons';
 import { ensureGameTextures } from '@/game/utils/textures';
@@ -66,9 +66,18 @@ export class MissionScene extends Phaser.Scene {
     this.load.image('enemy-shoot', `${enemyBase}/shoot.png`);
     this.load.image('enemy-grenade', `${enemyBase}/grenade.png`);
     this.load.image('enemy-jump', `${enemyBase}/jump.png`);
+
+    const bossBase = '/assets/boss';
+    this.load.image('boss-idle', `${bossBase}/boss-idle.png`);
+    this.load.image('boss-shoot', `${bossBase}/boss-shoot.png`);
   }
 
   create() {
+    // Phaser's scene.restart() reuses the same Scene instance, so class fields
+    // from the previous run must be reset explicitly. This guarantees ENTER
+    // after GAME OVER starts a completely fresh mission.
+    this.resetMissionState();
+
     ensureGameTextures(this);
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, GAME_HEIGHT + 400);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, GAME_HEIGHT);
@@ -102,6 +111,20 @@ export class MissionScene extends Phaser.Scene {
     this.showBanner('MISSION 01', 'CLEAR THE YARD');
   }
 
+  private resetMissionState() {
+    this.score = 0;
+    this.lives = 3;
+    this.checkpointX = 150;
+    this.gameEnded = false;
+
+    this.encounterIndex = 0;
+    this.activeEncounter = null;
+    this.activeEnemies = 0;
+    this.boundsMinX = 20;
+    this.boundsMaxX = WORLD_WIDTH - 20;
+    this.boss = null;
+  }
+
   update(time: number) {
     if (this.gameEnded) return;
 
@@ -114,7 +137,7 @@ export class MissionScene extends Phaser.Scene {
       if (enemy.active) enemy.updateAI(time, this.player.x, this.player.y);
     }
 
-    this.boss?.updateBoss(time, this.player.x, this.player.y);
+    this.boss?.updateBoss(time, this.player.x, this.player.y, this.getBossDodgeThreat());
     this.cleanupProjectiles();
     this.checkEncounterTrigger();
     this.updateBossHud();
@@ -219,7 +242,7 @@ export class MissionScene extends Phaser.Scene {
       .setScrollFactor(0).setDepth(101).setVisible(false);
     this.bossBarFill = this.add.rectangle(GAME_WIDTH / 2 - 226, 76, 452, 10, 0xe25a4f, 1)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(102).setVisible(false);
-    this.bossLabel = this.add.text(GAME_WIDTH / 2, 98, 'IRON BOX', {
+    this.bossLabel = this.add.text(GAME_WIDTH / 2, 98, 'BOSS HP 100 / 100', {
       fontFamily: 'monospace', fontSize: '14px', color: '#ffd6d1',
     }).setOrigin(0.5).setScrollFactor(0).setDepth(102).setVisible(false);
   }
@@ -286,6 +309,7 @@ export class MissionScene extends Phaser.Scene {
 
   private spawnBoss() {
     this.boss = new Boss(this, 4920, 585);
+    this.physics.add.collider(this.boss, this.platforms);
     this.physics.add.overlap(this.playerBullets, this.boss, this.hitBoss, undefined, this);
     this.physics.add.overlap(this.player, this.boss, () => this.killPlayer(), undefined, this);
     this.bossBarBg.setVisible(true);
@@ -417,40 +441,56 @@ export class MissionScene extends Phaser.Scene {
       this.time.delayedCall(1150, () => {
         if (grenade.active) this.explodeEnemyGrenade(grenade);
       });
+      this.time.delayedCall(2600, () => {
+        if (grenade.active) grenade.destroy();
+      });
       return;
     }
 
-    this.spawnEnemyBullet(event.x, event.y, targetX, targetY, 500);
+    this.spawnEnemyBullet(event.x, event.y, targetX, targetY, 560);
   }
 
-  private handleBossFire(event: { kind: 'bullet' | 'rocket'; x: number; y: number; targetX: number; targetY: number }) {
+  private handleBossFire(event: { kind: 'bullet' | 'grenade'; x: number; y: number; targetX: number; targetY: number }) {
     if (event.kind === 'bullet') {
-      this.spawnEnemyBullet(event.x, event.y, event.targetX, event.targetY, 430);
+      this.spawnEnemyBullet(event.x, event.y, event.targetX, event.targetY, 500);
       return;
     }
 
-    const rocket = this.enemyBullets.create(
+    const grenade = this.enemyBullets.create(
       event.x,
       event.y,
-      'rocket',
+      'grenade-enemy',
     ) as unknown as Phaser.Physics.Arcade.Image;
 
-    const body = rocket.body as Phaser.Physics.Arcade.Body;
+    const body = grenade.body as Phaser.Physics.Arcade.Body;
     body.enable = true;
     body.moves = true;
-    body.setAllowGravity(false);
-    body.setSize(24, 10, true);
+    body.setAllowGravity(true);
+    body.setGravityY(980);
+    body.setSize(14, 14, true);
 
-    const angle = Phaser.Math.Angle.Between(event.x, event.y, event.targetX, event.targetY);
-    rocket
+    const dx = event.targetX - event.x;
+    const direction: 1 | -1 = dx >= 0 ? 1 : -1;
+    const horizontalSpeed = Phaser.Math.Clamp(Math.abs(dx) * 0.82, 300, 520) * direction;
+
+    grenade
       .setActive(true)
       .setVisible(true)
       .setDepth(19)
-      .setTint(0xff6c6c)
-      .setRotation(angle)
-      .setData('kind', 'boss-rocket');
+      .setBounce(0.32)
+      .setData('kind', 'grenade-enemy');
 
-    rocket.setVelocity(Math.cos(angle) * 320, Math.sin(angle) * 320);
+    // Velocity is assigned last so adding the projectile to the physics group
+    // cannot reset it. The grenade travels toward Player on a visible arc.
+    grenade.setVelocity(horizontalSpeed, -455);
+    this.startGrenadeTrail(grenade, direction);
+
+    this.time.delayedCall(1150, () => {
+      if (grenade.active) this.explodeEnemyGrenade(grenade);
+    });
+    this.time.delayedCall(2600, () => {
+      if (grenade.active) grenade.destroy();
+    });
   }
 
   private spawnEnemyBullet(x: number, y: number, tx: number, ty: number, speed: number) {
@@ -471,10 +511,13 @@ export class MissionScene extends Phaser.Scene {
       .setActive(true)
       .setVisible(true)
       .setDepth(19)
+      .clearTint()
+      .setAlpha(1)
       .setRotation(angle)
       .setData('kind', 'bullet');
 
-    // Velocity is the final operation: the tracer immediately travels toward Player.
+    // Velocity is the final operation. The vector is normalized by the angle
+    // and always points from the bot muzzle to Player's current position.
     bullet.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
 
     // Safety TTL: no enemy projectile can ever remain as an invisible/static hazard.
@@ -489,7 +532,10 @@ export class MissionScene extends Phaser.Scene {
     if (!bullet.active || !enemy.active) return;
 
     const kind = bullet.getData('kind') as string;
-    if (kind === 'grenade-player') return;
+    if (kind === 'grenade-player') {
+      this.explodePlayerGrenade(bullet);
+      return;
+    }
 
     if (kind === 'rocket') {
       this.explodeRocket(bullet);
@@ -507,14 +553,18 @@ export class MissionScene extends Phaser.Scene {
     const boss = bossObj as unknown as Boss;
     if (!bullet.active || !boss.active) return;
     const kind = bullet.getData('kind') as string;
-    if (kind === 'grenade-player') return;
+    if (kind === 'grenade-player') {
+      this.explodePlayerGrenade(bullet);
+      return;
+    }
 
     if (kind === 'rocket') {
       this.explodeRocket(bullet);
       return;
     }
 
-    boss.takeDamage(Number(bullet.getData('damage') ?? 1));
+    // Every direct player bullet hit removes exactly 5 boss HP.
+    boss.takeDamage(5);
     bullet.destroy();
     this.hitSpark(boss.x - 40, boss.y - 20);
   }
@@ -529,11 +579,19 @@ export class MissionScene extends Phaser.Scene {
   }
 
   private enemyBulletHitsPlayer(_playerObj: ArcadePhysicsObject, bulletObj: ArcadePhysicsObject) {
-    const bullet = bulletObj as unknown as Phaser.Physics.Arcade.Image;
-    if (!bullet.active) return;
-    const kind = bullet.getData('kind') as string;
-    if (kind === 'grenade-enemy') return;
-    bullet.destroy();
+    const projectile = bulletObj as unknown as Phaser.Physics.Arcade.Image;
+    if (!projectile.active) return;
+
+    const kind = projectile.getData('kind') as string;
+
+    // Any enemy projectile touching Player is lethal. Grenades also explode
+    // immediately on contact, while gun bullets / rockets are destroyed first.
+    if (kind === 'grenade-enemy') {
+      this.explodeEnemyGrenade(projectile);
+      return;
+    }
+
+    projectile.destroy();
     this.killPlayer();
   }
 
@@ -597,7 +655,7 @@ export class MissionScene extends Phaser.Scene {
     rocket.destroy();
     this.explosionFx(x, y, 95);
     this.damageEnemiesInRadius(x, y, 95, 8);
-    if (this.boss?.active && Phaser.Math.Distance.Between(x, y, this.boss.x, this.boss.y) <= 130) this.boss.takeDamage(8);
+    if (this.boss?.active && Phaser.Math.Distance.Between(x, y, this.boss.x, this.boss.y) <= 130) this.boss.takeDamage(5);
   }
 
   private explodePlayerGrenade(grenade: Phaser.Physics.Arcade.Image) {
@@ -606,7 +664,7 @@ export class MissionScene extends Phaser.Scene {
     grenade.destroy();
     this.grenadeExplosionFx(x, y, 115);
     this.damageEnemiesInRadius(x, y, 115, 10);
-    if (this.boss?.active && Phaser.Math.Distance.Between(x, y, this.boss.x, this.boss.y) <= 150) this.boss.takeDamage(10);
+    if (this.boss?.active && Phaser.Math.Distance.Between(x, y, this.boss.x, this.boss.y) <= 150) this.boss.takeDamage(15);
   }
 
   private explodeEnemyGrenade(grenade: Phaser.Physics.Arcade.Image) {
@@ -736,10 +794,45 @@ export class MissionScene extends Phaser.Scene {
     this.hudLives.setText(`LIVES ${this.lives}`);
   }
 
+  private getBossDodgeThreat(): BossDodgeThreat | null {
+    if (!this.boss?.active || !this.playerBullets) return null;
+
+    let closest: BossDodgeThreat | null = null;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    for (const child of this.playerBullets.getChildren()) {
+      const projectile = child as Phaser.Physics.Arcade.Image;
+      if (!projectile.active || !projectile.body) continue;
+
+      const kind = projectile.getData('kind') as string;
+      if (kind === 'grenade-player') continue;
+
+      const body = projectile.body as Phaser.Physics.Arcade.Body;
+      const distance = Phaser.Math.Distance.Between(projectile.x, projectile.y, this.boss.x, this.boss.y);
+      if (distance >= closestDistance || distance > 320) continue;
+
+      const dx = this.boss.x - projectile.x;
+      const dy = this.boss.y - projectile.y;
+      const approaching = dx * body.velocity.x + dy * body.velocity.y > 0;
+      if (!approaching) continue;
+
+      closestDistance = distance;
+      closest = {
+        x: projectile.x,
+        y: projectile.y,
+        vx: body.velocity.x,
+        vy: body.velocity.y,
+      };
+    }
+
+    return closest;
+  }
+
   private updateBossHud() {
     if (!this.boss?.active) return;
     const ratio = Phaser.Math.Clamp(this.boss.hp / this.boss.maxHp, 0, 1);
     this.bossBarFill.width = 452 * ratio;
+    this.bossLabel.setText(`BOSS HP ${this.boss.hp} / ${this.boss.maxHp}`);
   }
 
   private flashEncounter(text: string) {

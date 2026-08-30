@@ -6,6 +6,13 @@ export function ensureGameTextures(scene: Phaser.Scene) {
   }
 
   makePlayerBullet(scene);
+
+  // Recreate enemy bullet texture on every fresh mission. Phaser keeps generated
+  // textures across scene.restart(), so an older red-dot texture could otherwise
+  // survive after a code update / hot reload.
+  if (scene.textures.exists('bullet-enemy')) {
+    scene.textures.remove('bullet-enemy');
+  }
   makeEnemyBullet(scene);
   makeGrenade(scene, 'grenade-player', 0x6f7d38, 0xdce6a0);
   makeGrenade(scene, 'grenade-enemy', 0x9d5d32, 0xffbc7a);
@@ -50,13 +57,12 @@ function makeEnemyBullet(scene: Phaser.Scene) {
   if (scene.textures.exists('bullet-enemy')) return;
   const g = scene.add.graphics();
 
-  // No red marker/dot: enemy fire is a compact pale tracer.
-  // It remains readable in motion without looking like a persistent hazard marker.
-  g.fillStyle(0x2b3135, 1);
-  g.fillRoundedRect(1, 2, 18, 5, 2);
-  g.fillStyle(0xffe9a6, 1);
-  g.fillRoundedRect(7, 3, 12, 3, 1.5);
-  g.generateTexture('bullet-enemy', 20, 9);
+  // Enemy fire is a short dark tracer with a pale center — never a red dot.
+  g.fillStyle(0x151a1d, 1);
+  g.fillRoundedRect(0, 2, 22, 5, 2);
+  g.fillStyle(0xf5e6aa, 1);
+  g.fillRoundedRect(8, 3, 14, 3, 1.5);
+  g.generateTexture('bullet-enemy', 22, 9);
   g.destroy();
 }
 
