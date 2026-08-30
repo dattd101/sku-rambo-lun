@@ -6,6 +6,12 @@ import { ENCOUNTERS, FLOOR_TOP, GAME_HEIGHT, GAME_WIDTH, WORLD_WIDTH, type Encou
 import { WEAPONS, type WeaponId } from '@/game/config/weapons';
 import { ensureGameTextures } from '@/game/utils/textures';
 
+type ArcadePhysicsObject =
+  | Phaser.Types.Physics.Arcade.GameObjectWithBody
+  | Phaser.Physics.Arcade.Body
+  | Phaser.Physics.Arcade.StaticBody
+  | Phaser.Tilemaps.Tile;
+
 export class MissionScene extends Phaser.Scene {
   private player!: Player;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
@@ -360,9 +366,9 @@ export class MissionScene extends Phaser.Scene {
     this.enemyBullets.add(bullet);
   }
 
-  private hitEnemy(bulletObj: Phaser.GameObjects.GameObject, enemyObj: Phaser.GameObjects.GameObject) {
-    const bullet = bulletObj as Phaser.Physics.Arcade.Image;
-    const enemy = enemyObj as Enemy;
+  private hitEnemy(bulletObj: ArcadePhysicsObject, enemyObj: ArcadePhysicsObject) {
+    const bullet = bulletObj as unknown as Phaser.Physics.Arcade.Image;
+    const enemy = enemyObj as unknown as Enemy;
     if (!bullet.active || !enemy.active) return;
 
     const kind = bullet.getData('kind') as string;
@@ -380,9 +386,9 @@ export class MissionScene extends Phaser.Scene {
     enemy.takeDamage(Math.max(1, enemy.hp));
   }
 
-  private hitBoss(bulletObj: Phaser.GameObjects.GameObject, bossObj: Phaser.GameObjects.GameObject) {
-    const bullet = bulletObj as Phaser.Physics.Arcade.Image;
-    const boss = bossObj as Boss;
+  private hitBoss(bulletObj: ArcadePhysicsObject, bossObj: ArcadePhysicsObject) {
+    const bullet = bulletObj as unknown as Phaser.Physics.Arcade.Image;
+    const boss = bossObj as unknown as Boss;
     if (!bullet.active || !boss.active) return;
     const kind = bullet.getData('kind') as string;
     if (kind === 'grenade-player') return;
@@ -397,8 +403,8 @@ export class MissionScene extends Phaser.Scene {
     this.hitSpark(boss.x - 40, boss.y - 20);
   }
 
-  private playerBulletHitsWorld(bulletObj: Phaser.GameObjects.GameObject) {
-    const bullet = bulletObj as Phaser.Physics.Arcade.Image;
+  private playerBulletHitsWorld(bulletObj: ArcadePhysicsObject) {
+    const bullet = bulletObj as unknown as Phaser.Physics.Arcade.Image;
     if (!bullet.active) return;
     const kind = bullet.getData('kind') as string;
     if (kind === 'grenade-player') return;
@@ -406,8 +412,8 @@ export class MissionScene extends Phaser.Scene {
     else bullet.destroy();
   }
 
-  private enemyBulletHitsPlayer(_playerObj: Phaser.GameObjects.GameObject, bulletObj: Phaser.GameObjects.GameObject) {
-    const bullet = bulletObj as Phaser.Physics.Arcade.Image;
+  private enemyBulletHitsPlayer(_playerObj: ArcadePhysicsObject, bulletObj: ArcadePhysicsObject) {
+    const bullet = bulletObj as unknown as Phaser.Physics.Arcade.Image;
     if (!bullet.active) return;
     const kind = bullet.getData('kind') as string;
     if (kind === 'grenade-enemy') return;
@@ -415,8 +421,8 @@ export class MissionScene extends Phaser.Scene {
     this.killPlayer();
   }
 
-  private enemyBulletHitsWorld(bulletObj: Phaser.GameObjects.GameObject) {
-    const bullet = bulletObj as Phaser.Physics.Arcade.Image;
+  private enemyBulletHitsWorld(bulletObj: ArcadePhysicsObject) {
+    const bullet = bulletObj as unknown as Phaser.Physics.Arcade.Image;
     if (!bullet.active) return;
     const kind = bullet.getData('kind') as string;
     if (kind === 'grenade-enemy') return;
@@ -483,8 +489,8 @@ export class MissionScene extends Phaser.Scene {
     this.time.delayedCall(1100, () => this.endMission(true));
   }
 
-  private collectPickup(_playerObj: Phaser.GameObjects.GameObject, pickupObj: Phaser.GameObjects.GameObject) {
-    const pickup = pickupObj as Phaser.Physics.Arcade.Sprite;
+  private collectPickup(_playerObj: ArcadePhysicsObject, pickupObj: ArcadePhysicsObject) {
+    const pickup = pickupObj as unknown as Phaser.Physics.Arcade.Sprite;
     const weapon = pickup.getData('weapon') as Exclude<WeaponId, 'pistol'>;
     const label = pickup.getData('label') as Phaser.GameObjects.Text | undefined;
     label?.destroy();

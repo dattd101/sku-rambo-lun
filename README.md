@@ -125,3 +125,7 @@ Ammo và tuning nằm tại `src/game/config/weapons.ts`.
 ## Public/commercial
 
 Gameplay có thể lấy cảm hứng từ run-and-gun arcade, nhưng nếu public/commercial nên tiếp tục dùng tên, artwork, music, sound effect, logo, enemy design và map layout do bạn tự tạo. Project này cố ý không bundle asset có bản quyền của SNK.
+
+## Vercel TypeScript fix
+
+Physics collision/overlap callbacks use Phaser 3.90 Arcade Physics callback-compatible types, so production TypeScript builds do not reject `Body | StaticBody | Tile | GameObjectWithBody`.
