@@ -10,7 +10,7 @@ const PLAYER_HEIGHTS: Record<string, number> = {
   'player-run-2': 82,
   'player-run-3': 82,
   'player-jump': 86,
-  'player-crouch': 68,
+  'player-crouch': 56,
   'player-pistol-ready': 78,
   'player-pistol-fire': 78,
   'player-grenade-ready': 78,
@@ -72,7 +72,8 @@ export class StickActor extends Phaser.Physics.Arcade.Sprite {
     this.crouching = crouching;
     this.aimingUp = aimingUp;
     const body = this.body as Phaser.Physics.Arcade.Body;
-    if (crouching) body.setSize(36, 44).setOffset(-1, 28);
+    // Keep the feet at the same floor line while making crouch genuinely low.
+    if (crouching) body.setSize(36, 34).setOffset(-1, 40);
     else body.setSize(30, 72).setOffset(2, 2);
   }
 
@@ -140,7 +141,7 @@ export class StickActor extends Phaser.Physics.Arcade.Sprite {
 
     this.playerImage
       .setTexture(textureKey)
-      .setPosition(this.x, this.y + 38)
+      .setPosition(this.x, this.y + (this.crouching ? 40 : 38))
       .setFlipX(this.facing < 0)
       .setAlpha(this.visualAlpha)
       .setVisible(true);

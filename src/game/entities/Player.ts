@@ -85,6 +85,7 @@ export class Player extends StickActor {
     const up = this.controls.up.isDown || this.controls.w.isDown;
     const down = this.controls.down.isDown || this.controls.s.isDown;
     const horizontal = Number(right) - Number(left);
+    const grounded = body.blocked.down || body.touching.down;
 
     if (horizontal !== 0) {
       body.setVelocityX(horizontal * this.moveSpeed);
@@ -93,11 +94,11 @@ export class Player extends StickActor {
       body.setVelocityX(0);
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.controls.jump) && body.blocked.down && !down) {
+    if (Phaser.Input.Keyboard.JustDown(this.controls.jump) && grounded && !down) {
       body.setVelocityY(-this.jumpSpeed);
     }
 
-    this.setPose(down && body.blocked.down, up && !down);
+    this.setPose(down && grounded, up && !down);
     this.x = Phaser.Math.Clamp(this.x, minX, maxX);
 
     if (this.controls.fire.isDown) this.tryFire(now, horizontal, up, down);
@@ -193,8 +194,8 @@ export class Player extends StickActor {
       // forward impulse so the throw clearly follows the facing direction.
       x: this.x + this.facing * 30,
       y: this.y - 18,
-      vx: this.facing * 520,
-      vy: -360,
+      vx: this.facing * 620,
+      vy: -340,
     } satisfies PlayerGrenadeEvent);
   }
 }

@@ -342,27 +342,85 @@ export class MissionScene extends Phaser.Scene {
 
   private handlePlayerGrenade(event: PlayerGrenadeEvent) {
     if (this.gameEnded) return;
-    const grenade = this.physics.add.image(event.x, event.y, 'grenade-player');
-    grenade.setBounce(0.32).setVelocity(event.vx, event.vy).setGravityY(1000).setDepth(20);
-    grenade.setData('kind', 'grenade-player');
-    this.playerBullets.add(grenade);
-    this.time.delayedCall(1050, () => grenade.active && this.explodePlayerGrenade(grenade));
+
+    // IMPORTANT: create inside the Physics Group first, configure the body,
+    // then assign velocity last. Adding an already-moving object to an
+    // Arcade Group can reset its body velocity and leave a harmful projectile
+    // hanging in mid-air.
+    const grenade = this.playerBullets.create(
+      event.x,
+      event.y,
+      'grenade-player',
+    ) as unknown as Phaser.Physics.Arcade.Image;
+
+    const body = grenade.body as Phaser.Physics.Arcade.Body;
+    body.enable = true;
+    body.moves = true;
+    body.setAllowGravity(true);
+    body.setSize(14, 16, true);
+
+    grenade
+      .setActive(true)
+      .setVisible(true)
+      .setDepth(20)
+      .setBounce(0.38)
+      .setGravityY(1000)
+      .setData('kind', 'grenade-player');
+
+    // Velocity is deliberately the final physics operation.
+    grenade.setVelocity(event.vx, event.vy);
+    this.startGrenadeTrail(grenade, 1);
+
+    this.time.delayedCall(1050, () => {
+      if (grenade.active) this.explodePlayerGrenade(grenade);
+    });
     this.updateHud();
   }
 
   private handleEnemyFire(event: EnemyFireEvent) {
-    if (this.gameEnded) return;
+    if (this.gameEnded || !this.player?.active) return;
+
+    // Always aim at the player's current position at the instant the attack is emitted.
+    // This prevents stale coordinates from making bullets fly away from the player.
+    const targetX = this.player.x;
+    const targetY = this.player.y - 14;
+
     if (event.kind === 'grenade') {
-      const grenade = this.physics.add.image(event.x, event.y, 'grenade-enemy');
-      const dx = event.targetX - event.x;
-      grenade.setVelocity(Phaser.Math.Clamp(dx * 0.8, -360, 360), -460).setGravityY(900).setBounce(0.35).setDepth(19);
-      grenade.setData('kind', 'grenade-enemy');
-      this.enemyBullets.add(grenade);
-      this.time.delayedCall(1200, () => grenade.active && this.explodeEnemyGrenade(grenade));
+      const grenade = this.enemyBullets.create(
+        event.x,
+        event.y,
+        'grenade-enemy',
+      ) as unknown as Phaser.Physics.Arcade.Image;
+
+      const body = grenade.body as Phaser.Physics.Arcade.Body;
+      body.enable = true;
+      body.moves = true;
+      body.setAllowGravity(true);
+      body.setSize(14, 16, true);
+
+      const dx = targetX - event.x;
+      const direction = dx >= 0 ? 1 : -1;
+      const horizontalSpeed = Phaser.Math.Clamp(Math.abs(dx) * 1.05, 270, 500) * direction;
+
+      grenade
+        .setActive(true)
+        .setVisible(true)
+        .setDepth(19)
+        .setBounce(0.3)
+        .setGravityY(980)
+        .setData('kind', 'grenade-enemy');
+
+      // Strong forward throw with an arc, then explode after the fuse.
+      grenade.setVelocity(horizontalSpeed, -430);
+      this.startGrenadeTrail(grenade, direction > 0 ? 1 : -1);
+
+      this.time.delayedCall(1150, () => {
+        if (grenade.active) this.explodeEnemyGrenade(grenade);
+      });
       return;
     }
 
-    this.spawnEnemyBullet(event.x, event.y, event.targetX, event.targetY, 360);
+    this.spawnEnemyBullet(event.x, event.y, targetX, targetY, 500);
   }
 
   private handleBossFire(event: { kind: 'bullet' | 'rocket'; x: number; y: number; targetX: number; targetY: number }) {
@@ -371,20 +429,58 @@ export class MissionScene extends Phaser.Scene {
       return;
     }
 
-    const rocket = this.physics.add.image(event.x, event.y, 'rocket').setTint(0xff6c6c).setDepth(19);
+    const rocket = this.enemyBullets.create(
+      event.x,
+      event.y,
+      'rocket',
+    ) as unknown as Phaser.Physics.Arcade.Image;
+
+    const body = rocket.body as Phaser.Physics.Arcade.Body;
+    body.enable = true;
+    body.moves = true;
+    body.setAllowGravity(false);
+    body.setSize(24, 10, true);
+
     const angle = Phaser.Math.Angle.Between(event.x, event.y, event.targetX, event.targetY);
+    rocket
+      .setActive(true)
+      .setVisible(true)
+      .setDepth(19)
+      .setTint(0xff6c6c)
+      .setRotation(angle)
+      .setData('kind', 'boss-rocket');
+
     rocket.setVelocity(Math.cos(angle) * 320, Math.sin(angle) * 320);
-    rocket.setRotation(angle);
-    rocket.setData('kind', 'boss-rocket');
-    this.enemyBullets.add(rocket);
   }
 
   private spawnEnemyBullet(x: number, y: number, tx: number, ty: number, speed: number) {
-    const bullet = this.physics.add.image(x, y, 'bullet-enemy').setDepth(19);
+    const bullet = this.enemyBullets.create(
+      x,
+      y,
+      'bullet-enemy',
+    ) as unknown as Phaser.Physics.Arcade.Image;
+
+    const body = bullet.body as Phaser.Physics.Arcade.Body;
+    body.enable = true;
+    body.moves = true;
+    body.setAllowGravity(false);
+    body.setSize(18, 7, true);
+
     const angle = Phaser.Math.Angle.Between(x, y, tx, ty);
+    bullet
+      .setActive(true)
+      .setVisible(true)
+      .setDepth(19)
+      .setRotation(angle)
+      .setData('kind', 'bullet');
+
+    // Velocity is the final operation: the tracer immediately travels toward Player.
     bullet.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
-    bullet.setData('kind', 'bullet');
-    this.enemyBullets.add(bullet);
+
+    // Safety TTL: no enemy projectile can ever remain as an invisible/static hazard.
+    this.time.delayedCall(2400, () => {
+      if (bullet.active) bullet.destroy();
+    });
   }
 
   private hitEnemy(bulletObj: ArcadePhysicsObject, enemyObj: ArcadePhysicsObject) {
@@ -450,6 +546,51 @@ export class MissionScene extends Phaser.Scene {
     bullet.destroy();
   }
 
+  private startGrenadeTrail(grenade: Phaser.Physics.Arcade.Image, spinDirection: 1 | -1) {
+    const timer = this.time.addEvent({
+      delay: 70,
+      loop: true,
+      callback: () => {
+        if (!grenade.active) {
+          timer.remove(false);
+          return;
+        }
+
+        grenade.rotation += spinDirection * 0.7;
+        const puff = this.add.circle(grenade.x, grenade.y + 2, 3, 0xe8e2d4, 0.5).setDepth(17);
+        this.tweens.add({
+          targets: puff,
+          x: puff.x - spinDirection * 10,
+          y: puff.y - 5,
+          scale: 1.8,
+          alpha: 0,
+          duration: 180,
+          onComplete: () => puff.destroy(),
+        });
+      },
+    });
+  }
+
+  private grenadeExplosionFx(x: number, y: number, radius: number) {
+    this.explosionFx(x, y, radius);
+
+    for (let i = 0; i < 7; i += 1) {
+      const angle = (Math.PI * 2 * i) / 7 + Math.random() * 0.35;
+      const distance = Phaser.Math.Between(20, Math.round(radius * 0.72));
+      const smoke = this.add.circle(x, y, Phaser.Math.Between(5, 9), 0x4f5354, 0.62).setDepth(29);
+      this.tweens.add({
+        targets: smoke,
+        x: x + Math.cos(angle) * distance,
+        y: y + Math.sin(angle) * distance - 12,
+        scale: 1.7,
+        alpha: 0,
+        duration: Phaser.Math.Between(260, 380),
+        ease: 'Quad.easeOut',
+        onComplete: () => smoke.destroy(),
+      });
+    }
+  }
+
   private explodeRocket(rocket: Phaser.Physics.Arcade.Image) {
     const x = rocket.x;
     const y = rocket.y;
@@ -463,7 +604,7 @@ export class MissionScene extends Phaser.Scene {
     const x = grenade.x;
     const y = grenade.y;
     grenade.destroy();
-    this.explosionFx(x, y, 115);
+    this.grenadeExplosionFx(x, y, 115);
     this.damageEnemiesInRadius(x, y, 115, 10);
     if (this.boss?.active && Phaser.Math.Distance.Between(x, y, this.boss.x, this.boss.y) <= 150) this.boss.takeDamage(10);
   }
@@ -472,7 +613,7 @@ export class MissionScene extends Phaser.Scene {
     const x = grenade.x;
     const y = grenade.y;
     grenade.destroy();
-    this.explosionFx(x, y, 95);
+    this.grenadeExplosionFx(x, y, 95);
     if (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 105) this.killPlayer();
   }
 

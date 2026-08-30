@@ -6,9 +6,9 @@ export function ensureGameTextures(scene: Phaser.Scene) {
   }
 
   makePlayerBullet(scene);
-  makeCircle(scene, 'bullet-enemy', 10, 0xff6f6f);
-  makeCircle(scene, 'grenade-player', 16, 0xd7e486);
-  makeCircle(scene, 'grenade-enemy', 16, 0xffa06e);
+  makeEnemyBullet(scene);
+  makeGrenade(scene, 'grenade-player', 0x6f7d38, 0xdce6a0);
+  makeGrenade(scene, 'grenade-enemy', 0x9d5d32, 0xffbc7a);
 
   if (!scene.textures.exists('rocket')) {
     const g = scene.add.graphics();
@@ -35,7 +35,6 @@ export function ensureGameTextures(scene: Phaser.Scene) {
   }
 }
 
-
 function makePlayerBullet(scene: Phaser.Scene) {
   if (scene.textures.exists('bullet-player')) return;
   const g = scene.add.graphics();
@@ -47,11 +46,32 @@ function makePlayerBullet(scene: Phaser.Scene) {
   g.destroy();
 }
 
-function makeCircle(scene: Phaser.Scene, key: string, size: number, color: number) {
-  if (scene.textures.exists(key)) return;
+function makeEnemyBullet(scene: Phaser.Scene) {
+  if (scene.textures.exists('bullet-enemy')) return;
   const g = scene.add.graphics();
-  g.fillStyle(color, 1);
-  g.fillCircle(size / 2, size / 2, size / 2);
-  g.generateTexture(key, size, size);
+
+  // No red marker/dot: enemy fire is a compact pale tracer.
+  // It remains readable in motion without looking like a persistent hazard marker.
+  g.fillStyle(0x2b3135, 1);
+  g.fillRoundedRect(1, 2, 18, 5, 2);
+  g.fillStyle(0xffe9a6, 1);
+  g.fillRoundedRect(7, 3, 12, 3, 1.5);
+  g.generateTexture('bullet-enemy', 20, 9);
+  g.destroy();
+}
+
+function makeGrenade(scene: Phaser.Scene, key: string, bodyColor: number, highlightColor: number) {
+  if (scene.textures.exists(key)) return;
+
+  const g = scene.add.graphics();
+  g.fillStyle(bodyColor, 1);
+  g.fillRoundedRect(4, 6, 12, 12, 5);
+  g.fillStyle(highlightColor, 0.85);
+  g.fillCircle(8, 10, 2.2);
+  g.fillStyle(0x2b2d25, 1);
+  g.fillRect(8, 2, 5, 5);
+  g.lineStyle(2, 0x2b2d25, 1);
+  g.strokeCircle(15, 4, 3);
+  g.generateTexture(key, 20, 20);
   g.destroy();
 }

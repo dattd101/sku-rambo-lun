@@ -1,18 +1,18 @@
 # Rambo Lùn
 
-Mini run-and-gun 2D bằng **Next.js 15 + Phaser 3 + TypeScript**. Toàn bộ art trong bản MVP được vẽ bằng Phaser Graphics / shape, không dùng sprite, sound, logo hoặc map asset của Metal Slug.
+Mini run-and-gun 2D bằng **Next.js 15 + Phaser 3 + TypeScript**. Player và bot dùng sprite PNG cục bộ; projectile/effect dùng Phaser Graphics.
 
 ## Có sẵn
 
 - 1 mission side-scroll dài 5200 px
-- Người que: chạy, nhảy, cúi, ngắm lên, bắn, ném grenade
+- Player sprite: chạy, nhảy, cúi, bắn, ném grenade
 - One-hit death, 3 lives
 - 10 grenade khi bắt đầu
 - Pistol vô hạn
 - HMG: 200 viên
 - Shotgun: 30 viên
 - Rocket Launcher: 30 viên
-- Soldier, Grenadier, Turret
+- Bot sprite: bắn súng, ném lựu đạn, tự nhảy và tấn công trên không
 - Mini boss tank 80 HP với nhiều phase tốc độ
 - Camera side-scroll + encounter lock
 - Pickup H / S / R
@@ -25,7 +25,7 @@ Mini run-and-gun 2D bằng **Next.js 15 + Phaser 3 + TypeScript**. Toàn bộ ar
 
 ## Yêu cầu
 
-- Node.js 20+ (khuyên Node 22)
+- Node.js 22.x
 - npm
 
 ## Chạy local
