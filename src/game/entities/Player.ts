@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { WEAPONS, type WeaponId } from '@/game/config/weapons';
 import { StickActor } from './StickActor';
 

@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { Player, type PlayerFireEvent, type PlayerGrenadeEvent } from '@/game/entities/Player';
 import { Enemy, type EnemyFireEvent } from '@/game/entities/Enemy';
 import { Boss } from '@/game/entities/Boss';

@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { StickActor } from './StickActor';
 
 export type EnemyKind = 'soldier' | 'grenadier' | 'turret';
@@ -27,7 +27,7 @@ export class Enemy extends StickActor {
   private nextGrenadeAt = 0;
   private nextJumpAt = 0;
   private attackVisualUntil = 0;
-  private grenadeVisualUntil = 0;
+  private grenadeAttackVisualUntil = 0;
   private jumpAttackUntil = 0;
 
   constructor(scene: Phaser.Scene, kind: EnemyKind, x: number, y: number) {
@@ -183,14 +183,14 @@ export class Enemy extends StickActor {
   }
 
   private throwGrenade(now: number, targetX: number, targetY: number) {
-    this.grenadeVisualUntil = Math.max(this.grenadeVisualUntil, now + 430);
+    this.grenadeAttackVisualUntil = Math.max(this.grenadeAttackVisualUntil, now + 430);
     this.emitFire(targetX, targetY, 'grenade');
   }
 
   private drawEnemyByState(now: number, airborne: boolean) {
     if (airborne) {
       this.setEnemyVisualPose('jump');
-    } else if (now < this.grenadeVisualUntil) {
+    } else if (now < this.grenadeAttackVisualUntil) {
       this.setEnemyVisualPose('grenade');
     } else if (now < this.attackVisualUntil) {
       this.setEnemyVisualPose('shoot');

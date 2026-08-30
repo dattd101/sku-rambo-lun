@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '@/game/config/level';
 import { MissionScene } from '@/game/scenes/MissionScene';
 

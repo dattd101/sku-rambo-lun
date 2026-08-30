@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 
 export class Boss extends Phaser.Physics.Arcade.Sprite {
   hp = 80;

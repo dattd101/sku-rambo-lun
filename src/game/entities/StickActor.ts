@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import type { WeaponId } from '@/game/config/weapons';
 
 export type StickColor = number;
