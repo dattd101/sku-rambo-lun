@@ -30,6 +30,10 @@ export class Enemy extends StickActor {
     this.hp = stats.hp;
     this.scoreValue = stats.score;
 
+    if (kind === 'soldier') this.setWeaponVisual('pistol');
+    if (kind === 'grenadier') this.setWeaponVisual('shotgun');
+    if (kind === 'turret') this.setWeaponVisual('hmg');
+
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (kind === 'turret') {
       body.setAllowGravity(false);

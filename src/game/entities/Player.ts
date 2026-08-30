@@ -46,6 +46,7 @@ export class Player extends StickActor {
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 0xf7fbff);
     this.setDepth(12);
+    this.setWeaponVisual('pistol');
 
     const keyboard = scene.input.keyboard;
     if (!keyboard) throw new Error('Keyboard input is required');
@@ -112,6 +113,7 @@ export class Player extends StickActor {
   equip(weapon: Exclude<WeaponId, 'pistol'>) {
     this.weapon = weapon;
     this.ammo = WEAPONS[weapon].ammo;
+    this.setWeaponVisual(weapon);
   }
 
   respawn(x: number, y: number, now: number) {
@@ -174,6 +176,7 @@ export class Player extends StickActor {
       if (this.ammo <= 0) {
         this.weapon = 'pistol';
         this.ammo = Number.POSITIVE_INFINITY;
+        this.setWeaponVisual('pistol');
         this.scene.events.emit('weapon-empty');
       }
     }

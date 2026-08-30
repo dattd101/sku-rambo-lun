@@ -19,8 +19,8 @@ export type WeaponConfig = {
 export const WEAPONS: Record<WeaponId, WeaponConfig> = {
   pistol: {
     id: 'pistol',
-    label: 'Pistol',
-    shortLabel: 'P',
+    label: 'Glock 12',
+    shortLabel: 'G',
     ammo: Number.POSITIVE_INFINITY,
     fireRate: 210,
     bulletSpeed: 760,
